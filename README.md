@@ -4,7 +4,7 @@ Forked from [(Pub) flutter_datetime_picker](https://pub.dev/packages/flutter_dat
 
 This package only works on Flutter >=3.10.0. If you need an older version, please use the original package.
 
-[(Pub) flutter_datetime_picker_plus](https://pub.dev/packages/flutter_datetime_picker_plus)
+[(Pub) flutter_datetime_picker](https://pub.dev/packages/flutter_datetime_picker)
 
 
 # Documentation

@@ -4,14 +4,15 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_datetime_picker_plus/src/date_model.dart';
-import 'package:flutter_datetime_picker_plus/src/datetime_picker_theme.dart'
+import 'package:flutter_datetime_picker/src/date_model.dart';
+import 'package:flutter_datetime_picker/src/datetime_picker_theme.dart'
     as picker_theme;
-import 'package:flutter_datetime_picker_plus/src/i18n_model.dart';
+import 'package:flutter_datetime_picker/src/i18n_model.dart';
+import 'package:flutter_datetime_picker/src/types.dart';
 
-export 'package:flutter_datetime_picker_plus/src/date_model.dart';
-export 'package:flutter_datetime_picker_plus/src/datetime_picker_theme.dart';
-export 'package:flutter_datetime_picker_plus/src/i18n_model.dart';
+export 'package:flutter_datetime_picker/src/date_model.dart';
+export 'package:flutter_datetime_picker/src/datetime_picker_theme.dart';
+export 'package:flutter_datetime_picker/src/i18n_model.dart';
 
 typedef DateChangedCallback(DateTime time);
 typedef DateCancelledCallback();
@@ -157,6 +158,43 @@ class DatePicker {
   }
 
   ///
+  /// Display month & year picker bottom sheet.
+  ///
+  static Future<DateTime?> showMonthPicker(
+    BuildContext context, {
+    bool showTitleActions = true,
+    DateChangedCallback? onChanged,
+    DateChangedCallback? onConfirm,
+    DateCancelledCallback? onCancel,
+    DateTime? minTime,
+    DateTime? maxTime,
+    locale = LocaleType.en,
+    DateTime? currentTime,
+    picker_theme.DatePickerTheme? theme,
+  }) async {
+    return await Navigator.push(
+      context,
+      _DatePickerRoute(
+        showTitleActions: showTitleActions,
+        onChanged: onChanged,
+        onConfirm: onConfirm,
+        onCancel: onCancel,
+        locale: locale,
+        theme: theme,
+        barrierLabel:
+            MaterialLocalizations.of(context).modalBarrierDismissLabel,
+        pickerModel: DatePickerModel(
+          currentTime: currentTime,
+          minTime: minTime,
+          maxTime: maxTime,
+          locale: locale,
+        ),
+        pickerType: DatePickerTypes.month,
+      ),
+    );
+  }
+
+  ///
   /// Display date picker bottom sheet witch custom picker model.
   ///
   static Future<DateTime?> showPicker(
@@ -195,6 +233,7 @@ class _DatePickerRoute<T> extends PopupRoute<T> {
     picker_theme.DatePickerTheme? theme,
     this.barrierLabel,
     this.locale,
+    this.pickerType = DatePickerTypes.date,
     RouteSettings? settings,
     BasePickerModel? pickerModel,
   })  : this.pickerModel = pickerModel ?? DatePickerModel(),
@@ -208,6 +247,7 @@ class _DatePickerRoute<T> extends PopupRoute<T> {
   final LocaleType? locale;
   final picker_theme.DatePickerTheme theme;
   final BasePickerModel pickerModel;
+  final DatePickerTypes? pickerType;
 
   @override
   Duration get transitionDuration => const Duration(milliseconds: 200);
@@ -242,6 +282,7 @@ class _DatePickerRoute<T> extends PopupRoute<T> {
         locale: this.locale,
         route: this,
         pickerModel: pickerModel,
+        pickerType: pickerType,
       ),
     );
     return InheritedTheme.captureAll(context, bottomSheet);
@@ -255,6 +296,7 @@ class _DatePickerComponent extends StatefulWidget {
     required this.pickerModel,
     this.onChanged,
     this.locale,
+    this.pickerType = DatePickerTypes.date,
   }) : super(key: key);
 
   final DateChangedCallback? onChanged;
@@ -264,7 +306,7 @@ class _DatePickerComponent extends StatefulWidget {
   final LocaleType? locale;
 
   final BasePickerModel pickerModel;
-
+  final DatePickerTypes? pickerType;
   @override
   State<StatefulWidget> createState() {
     return _DatePickerState();
@@ -272,9 +314,9 @@ class _DatePickerComponent extends StatefulWidget {
 }
 
 class _DatePickerState extends State<_DatePickerComponent> {
-  late FixedExtentScrollController leftScrollCtrl,
-      middleScrollCtrl,
-      rightScrollCtrl;
+  late FixedExtentScrollController firstScrollCtrl,
+      secondScrollCtrl,
+      thirdScrollCtrl;
 
   @override
   void initState() {
@@ -284,11 +326,11 @@ class _DatePickerState extends State<_DatePickerComponent> {
 
   void refreshScrollOffset() {
 //    print('refreshScrollOffset ${widget.pickerModel.currentRightIndex()}');
-    leftScrollCtrl = FixedExtentScrollController(
+    firstScrollCtrl = FixedExtentScrollController(
         initialItem: widget.pickerModel.currentLeftIndex());
-    middleScrollCtrl = FixedExtentScrollController(
+    secondScrollCtrl = FixedExtentScrollController(
         initialItem: widget.pickerModel.currentMiddleIndex());
-    rightScrollCtrl = FixedExtentScrollController(
+    thirdScrollCtrl = FixedExtentScrollController(
         initialItem: widget.pickerModel.currentRightIndex());
   }
 
@@ -411,7 +453,7 @@ class _DatePickerState extends State<_DatePickerComponent> {
                       ValueKey(widget.pickerModel.currentLeftIndex()),
                       theme,
                       widget.pickerModel.leftStringAtIndex,
-                      leftScrollCtrl,
+                      firstScrollCtrl,
                       widget.pickerModel.layoutProportions()[0], (index) {
                       widget.pickerModel.setLeftIndex(index);
                     }, (index) {
@@ -432,7 +474,7 @@ class _DatePickerState extends State<_DatePickerComponent> {
                       ValueKey(widget.pickerModel.currentLeftIndex()),
                       theme,
                       widget.pickerModel.middleStringAtIndex,
-                      middleScrollCtrl,
+                      secondScrollCtrl,
                       widget.pickerModel.layoutProportions()[1], (index) {
                       widget.pickerModel.setMiddleIndex(index);
                     }, (index) {
@@ -443,28 +485,30 @@ class _DatePickerState extends State<_DatePickerComponent> {
                     })
                   : null,
             ),
-            Text(
-              widget.pickerModel.rightDivider(),
-              style: theme.itemStyle,
-            ),
-            Container(
-              child: widget.pickerModel.layoutProportions()[2] > 0
-                  ? _renderColumnView(
-                      ValueKey(widget.pickerModel.currentMiddleIndex() * 100 +
-                          widget.pickerModel.currentLeftIndex()),
-                      theme,
-                      widget.pickerModel.rightStringAtIndex,
-                      rightScrollCtrl,
-                      widget.pickerModel.layoutProportions()[2], (index) {
-                      widget.pickerModel.setRightIndex(index);
-                    }, (index) {
-                      setState(() {
-                        refreshScrollOffset();
-                        _notifyDateChanged();
-                      });
-                    })
-                  : null,
-            ),
+            if (widget.pickerType != DatePickerTypes.month) ...[
+              Text(
+                widget.pickerModel.rightDivider(),
+                style: theme.itemStyle,
+              ),
+              Container(
+                child: widget.pickerModel.layoutProportions()[2] > 0
+                    ? _renderColumnView(
+                        ValueKey(widget.pickerModel.currentMiddleIndex() * 100 +
+                            widget.pickerModel.currentLeftIndex()),
+                        theme,
+                        widget.pickerModel.rightStringAtIndex,
+                        thirdScrollCtrl,
+                        widget.pickerModel.layoutProportions()[2], (index) {
+                        widget.pickerModel.setRightIndex(index);
+                      }, (index) {
+                        setState(() {
+                          refreshScrollOffset();
+                          _notifyDateChanged();
+                        });
+                      })
+                    : null,
+              ),
+            ]
           ],
         ),
       ),
